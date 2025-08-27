@@ -3,6 +3,9 @@
 from typing import Any, Dict, List, Tuple
 import torch
 from transformers import pipeline
+from PIL import Image
+from typing import Iterable
+
 
 # Detect best available device (Apple Silicon -> MPS, else CUDA, else CPU)
 def _pick_device() -> Tuple[str, int]:
@@ -73,3 +76,80 @@ def predict(image) -> Dict[str, Any]:
         "raw": outputs,
         "device": _DEVICE_STR,
     }
+
+def predict_many(images: Iterable[Image.Image], batch_size: int = 8):
+    """
+    Run inference over many PIL Images.
+    Returns a list of dicts in the same shape as predict(...).
+    """
+    clf = get_classifier()
+
+    # Hugging Face pipelines support batching when you pass a list.
+    # We’ll accumulate results per image to keep shapes consistent.
+    results = []
+    batch = []
+    # Keep a mapping of index -> image to preserve order
+    for img in images:
+        batch.append(img)
+
+        if len(batch) == batch_size:
+            outputs_batch = clf(batch, top_k=2)
+            # outputs_batch is a list (one list-of-dicts per image)
+            for outputs in outputs_batch:
+                outputs = sorted(outputs, key=lambda x: x["score"], reverse=True)
+                top_label = outputs[0]["label"].strip().lower()
+                nsfw_keywords = {"nsfw", "adult", "explicit", "porn", "unsafe"}
+                sfw_keywords  = {"sfw", "safe", "clean"}
+                if top_label in nsfw_keywords:
+                    final_label = "NSFW"; confidence = outputs[0]["score"]
+                elif top_label in sfw_keywords:
+                    final_label = "SFW"; confidence = outputs[0]["score"]
+                else:
+                    nsfw_score = 0.0; sfw_score = 0.0
+                    for o in outputs:
+                        l = o["label"].strip().lower()
+                        if l in nsfw_keywords: nsfw_score = max(nsfw_score, o["score"])
+                        if l in sfw_keywords:  sfw_score  = max(sfw_score, o["score"])
+                    if nsfw_score >= sfw_score:
+                        final_label, confidence = "NSFW", nsfw_score
+                    else:
+                        final_label, confidence = "SFW", sfw_score
+                results.append({
+                    "label": final_label,
+                    "confidence": float(confidence),
+                    "raw": outputs,
+                    "device": _DEVICE_STR,
+                })
+            batch = []
+
+    # Flush any remaining images
+    if batch:
+        outputs_batch = clf(batch, top_k=2)
+        for outputs in outputs_batch:
+            outputs = sorted(outputs, key=lambda x: x["score"], reverse=True)
+            top_label = outputs[0]["label"].strip().lower()
+            nsfw_keywords = {"nsfw", "adult", "explicit", "porn", "unsafe"}
+            sfw_keywords  = {"sfw", "safe", "clean"}
+            if top_label in nsfw_keywords:
+                final_label = "NSFW"; confidence = outputs[0]["score"]
+            elif top_label in sfw_keywords:
+                final_label = "SFW"; confidence = outputs[0]["score"]
+            else:
+                nsfw_score = 0.0; sfw_score = 0.0
+                for o in outputs:
+                    l = o["label"].strip().lower()
+                    if l in nsfw_keywords: nsfw_score = max(nsfw_score, o["score"])
+                    if l in sfw_keywords:  sfw_score  = max(sfw_score, o["score"])
+                if nsfw_score >= sfw_score:
+                    final_label, confidence = "NSFW", nsfw_score
+                else:
+                    final_label, confidence = "SFW", sfw_score
+            results.append({
+                "label": final_label,
+                "confidence": float(confidence),
+                "raw": outputs,
+                "device": _DEVICE_STR,
+            })
+
+    return results
+
