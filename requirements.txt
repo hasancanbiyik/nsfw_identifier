@@ -1,0 +1,7 @@
+# requirements.txt
+torch
+transformers>=4.40.0
+huggingface_hub
+Pillow
+streamlit
+accelerate
