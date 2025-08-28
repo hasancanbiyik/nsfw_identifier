@@ -5,3 +5,8 @@ huggingface_hub
 Pillow
 streamlit
 accelerate
+
+# adding the requirements for FastAPI
+fastapi
+uvicorn[standard]
+httpx
