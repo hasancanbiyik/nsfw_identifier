@@ -1,1 +1,10 @@
 # .gitignore
+# local data / results
+test_images/
+results/
+eval_results.csv
+
+# macOS / Python
+.DS_Store
+__pycache__/
+*.pyc
