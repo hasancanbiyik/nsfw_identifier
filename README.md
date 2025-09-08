@@ -26,7 +26,7 @@ Runs entirely **locally** (no images leave your machine) and supports **Apple Si
 ## Installation
 
 ```bash
-git clone https://github.com/<your-username>/nsfw_identifier.git
+git clone https://github.com/hasancanbiyik/nsfw_identifier
 cd nsfw_identifier
 
 python3 -m venv .venv
